@@ -28,6 +28,7 @@ from pdf2md.backends import create_backend
 from pdf2md.backends.llama_cpp import DEFAULT_LLAMA_CPP_HOST
 from pdf2md.backends.ollama import DEFAULT_OLLAMA_HOST, DEFAULT_OLLAMA_MODEL
 from pdf2md.converter import Converter, ProgressEvent, resolve_output_path
+from pdf2md.postprocess import restore_image_refs_in_file
 
 console = Console()
 
@@ -115,6 +116,14 @@ _DEFAULT_HOSTS = {
     show_default=True,
     help="Skip OCR; re-run post-processing (hybrid/merge) from a cached OCR output folder.",
 )
+@click.option(
+    "--fix-image-refs",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Restore missing image references in an existing output folder. "
+    "Scans images/ for unreferenced files and inserts them at correct positions.",
+)
 @click.version_option(__version__, prog_name="pdf2md")
 def main(
     input_path: str,
@@ -130,6 +139,7 @@ def main(
     system_prompt: bool,
     hybrid: bool,
     merge_only: bool,
+    fix_image_refs: bool,
 ) -> None:
     """Convert PDF files to Markdown using vision-language OCR.
 
@@ -165,7 +175,49 @@ def main(
         pdf2md ./papers/                                            # batch, output next to each PDF
         pdf2md ./papers/ ./papers_md/                               # batch, separate output tree
         pdf2md --merge-only ./doc/ --hybrid --cleanup-model phi-4   # re-merge with different model
+        pdf2md --fix-image-refs ./doc/                               # restore missing image refs
     """
+    # -- Quick-exit mode: --fix-image-refs -----------------------------------
+    if fix_image_refs:
+        in_path = Path(input_path)
+        console.print(f"[bold]pdf2md[/bold] v{__version__}")
+        console.print("  Mode:       [bold cyan]fix-image-refs[/bold cyan]")
+        console.print(f"  Input:      {in_path}")
+        console.print()
+
+        # Determine which directories to process
+        dirs_to_process: list[Path] = []
+        cache_marker = in_path / "ocr_cache" / "metadata.json"
+        if cache_marker.exists():
+            dirs_to_process = [in_path]
+        else:
+            # Search for output folders with a cache
+            dirs_to_process = sorted(p.parent for p in in_path.rglob("ocr_cache/metadata.json"))
+            if not dirs_to_process:
+                # No cache — try as a single output folder anyway
+                if (in_path / "images").exists():
+                    dirs_to_process = [in_path]
+                else:
+                    console.print("[red]Error:[/red] No output folders with images/ found.")
+                    sys.exit(1)
+
+        total_restored: list[str] = []
+        for out_dir in dirs_to_process:
+            console.print(f"  Processing: {out_dir.name}/")
+            restored = restore_image_refs_in_file(out_dir)
+            total_restored.extend(restored)
+
+        if total_restored:
+            console.print(
+                f"\n[green]Done[/green] — restored {len(total_restored)} image reference(s):"
+            )
+            for name in total_restored:
+                console.print(f"    + {name}")
+        else:
+            console.print("\n[green]Done[/green] — all images already referenced, nothing to fix.")
+        return
+
+    # -- Normal mode ---------------------------------------------------------
     # Resolve the server host: --host takes priority, then default per backend.
     effective_host = host or _DEFAULT_HOSTS.get(backend, DEFAULT_OLLAMA_HOST)
 

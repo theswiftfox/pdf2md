@@ -18,6 +18,7 @@ from pdf2md.postprocess import (
     clean_ocr_output,
     combine_pages,
     merge_cross_page_content,
+    restore_missing_image_refs,
     rewrite_image_references,
 )
 
@@ -220,8 +221,14 @@ class Converter:
 
         # Combine pages and write the markdown file
         # -- Phase 1.5: hybrid merge (raw text + OCR) --
+        cache_pages = list(pages)  # snapshot before hybrid merge for image restoration
         if self.hybrid and raw_texts:
             pages = self._hybrid_merge(pages, raw_texts, total, on_progress)
+
+        # -- Phase 1.75: restore any image references lost during hybrid merge --
+        images_dir = output_dir / "images"
+        if images_dir.exists():
+            pages, _restored = restore_missing_image_refs(pages, images_dir, cache_pages)
 
         # -- Phase 2: cross-page merge --
         if self.merge_pages:
@@ -629,8 +636,14 @@ class Converter:
         )
 
         # -- Phase 1.5: hybrid merge --
+        cache_pages = list(pages)  # snapshot for image restoration
         if self.hybrid and raw_texts:
             pages = self._hybrid_merge(pages, raw_texts, total, on_progress)
+
+        # -- Phase 1.75: restore any image references lost during hybrid merge --
+        images_dir = output_dir / "images"
+        if images_dir.exists():
+            pages, _restored = restore_missing_image_refs(pages, images_dir, cache_pages)
 
         # -- Phase 2: cross-page merge --
         if self.merge_pages:
