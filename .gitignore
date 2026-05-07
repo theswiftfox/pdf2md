@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Elena Gantner
+
+__pycache__/
+
+output/
+
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+*.zip

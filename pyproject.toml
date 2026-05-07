@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Elena Gantner
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pdf2md"
+version = "0.1.0"
+description = "Convert PDFs to Markdown using vision-language OCR (llama.cpp / Ollama)"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "click>=8.0",
+    "PyMuPDF>=1.24",
+    "Pillow>=10.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+pdf2md = "pdf2md.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pdf2md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+# E/F/W = pycodestyle + pyflakes
+# I = isort (import sorting)
+# UP = pyupgrade (modernize syntax)
+# B = bugbear (common pitfalls)
+# SIM = simplify (unnecessary complexity)
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["fitz"]
+ignore_missing_imports = true
