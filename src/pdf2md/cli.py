@@ -18,6 +18,7 @@ from rich.progress import (
     MofNCompleteColumn,
     Progress,
     SpinnerColumn,
+    TaskID,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
@@ -318,40 +319,54 @@ def main(
         console=console,
     )
 
-    current_task_id = None
+    current_task_id: TaskID | None = None
+    current_task_desc: str = ""
+    current_task_total: int = 0
+    previous_task_ids: list[TaskID] = []
 
     def on_progress(event: ProgressEvent) -> None:
-        nonlocal current_task_id
+        nonlocal current_task_id, current_task_desc, current_task_total
 
         if event.stage == "file_start":
             # Mark previous task complete if any
             if current_task_id is not None:
-                progress.update(current_task_id, completed=progress.tasks[current_task_id].total)
+                progress.update(current_task_id, completed=current_task_total)
+                previous_task_ids.append(current_task_id)
+            # Remove all progress bars from the previous file
+            for tid in previous_task_ids:
+                progress.remove_task(tid)
+            previous_task_ids.clear()
             console.print(f"\n[bold cyan]Converting:[/bold cyan] {event.message}")
             current_task_id = None
 
         elif event.stage == "ocr":
             if current_task_id is None:
                 current_task_id = progress.add_task("OCR pages", total=event.total)
+                current_task_desc = "OCR pages"
+                current_task_total = event.total
             progress.update(current_task_id, completed=event.current + 1)
 
         elif event.stage == "hybrid":
             # Finish the OCR progress bar if still open
             if current_task_id is not None:
-                task_desc = progress.tasks[current_task_id].description
-                if "Hybrid" not in task_desc:
+                if "Hybrid" not in current_task_desc:
                     progress.update(
                         current_task_id,
-                        completed=progress.tasks[current_task_id].total,
+                        completed=current_task_total,
                     )
+                    previous_task_ids.append(current_task_id)
                     current_task_id = None
             if current_task_id is None:
                 current_task_id = progress.add_task("Hybrid merge", total=event.total)
+                current_task_desc = "Hybrid merge"
+                current_task_total = event.total
             progress.update(current_task_id, completed=event.current + 1)
 
         elif event.stage == "file_done":
             if current_task_id is not None:
                 progress.update(current_task_id, completed=event.total)
+                previous_task_ids.append(current_task_id)
+                current_task_id = None
 
     # Make Ctrl+C immediately raise KeyboardInterrupt even if we're
     # inside a blocking urllib call or thread-pool future.

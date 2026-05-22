@@ -228,7 +228,10 @@ class Converter:
         # -- Phase 1.75: restore any image references lost during hybrid merge --
         images_dir = output_dir / "images"
         if images_dir.exists():
-            pages, _restored = restore_missing_image_refs(pages, images_dir, cache_pages)
+            try:
+                pages, _restored = restore_missing_image_refs(pages, images_dir, cache_pages)
+            except Exception:
+                logger.warning("Image ref restoration failed for %s", output_dir, exc_info=True)
 
         # -- Phase 2: cross-page merge --
         if self.merge_pages:
@@ -392,7 +395,7 @@ class Converter:
             for prep in prepared_items:
                 try:
                     results = self.backend.generate_from_prepared([prep])
-                    raw_texts.append(results[0])
+                    raw_texts.append(results[0] if results else "<!-- OCR ERROR: empty result -->")
                 except Exception as e:
                     raw_texts.append(f"<!-- OCR ERROR: {e} -->")
 
@@ -400,7 +403,8 @@ class Converter:
         for offset in range(len(prepared_items)):
             pi = batch_start + offset
             try:
-                cleaned = clean_ocr_output(raw_texts[offset])
+                raw = raw_texts[offset] if offset < len(raw_texts) else ""
+                cleaned = clean_ocr_output(raw)
             except Exception as e:
                 cleaned = f"<!-- OCR ERROR on page {pi + 1}: {e} -->"
 
@@ -643,7 +647,10 @@ class Converter:
         # -- Phase 1.75: restore any image references lost during hybrid merge --
         images_dir = output_dir / "images"
         if images_dir.exists():
-            pages, _restored = restore_missing_image_refs(pages, images_dir, cache_pages)
+            try:
+                pages, _restored = restore_missing_image_refs(pages, images_dir, cache_pages)
+            except Exception:
+                logger.warning("Image ref restoration failed for %s", output_dir, exc_info=True)
 
         # -- Phase 2: cross-page merge --
         if self.merge_pages:
@@ -693,7 +700,7 @@ class Converter:
             try:
                 self._convert_file(pdf_path, doc_folder, on_progress, display_name=label)
             except Exception as e:
-                logger.error("Failed to convert %s: %s", relative, e)
+                logger.exception("Failed to convert %s: %s", relative, e)
                 failed.append(str(relative))
 
         if failed:
