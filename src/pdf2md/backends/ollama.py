@@ -102,7 +102,7 @@ def _image_to_base64(image: Image.Image) -> str:
 
 def _is_retryable(exc: Exception) -> bool:
     """Return True if the error is transient and worth retrying."""
-    if isinstance(exc, (TimeoutError, ConnectionError)):
+    if isinstance(exc, TimeoutError | ConnectionError):
         return True
     if isinstance(exc, HTTPError) and exc.code >= 500:
         return True

@@ -348,14 +348,13 @@ def main(
 
         elif event.stage == "hybrid":
             # Finish the OCR progress bar if still open
-            if current_task_id is not None:
-                if "Hybrid" not in current_task_desc:
-                    progress.update(
-                        current_task_id,
-                        completed=current_task_total,
-                    )
-                    previous_task_ids.append(current_task_id)
-                    current_task_id = None
+            if current_task_id is not None and "Hybrid" not in current_task_desc:
+                progress.update(
+                    current_task_id,
+                    completed=current_task_total,
+                )
+                previous_task_ids.append(current_task_id)
+                current_task_id = None
             if current_task_id is None:
                 current_task_id = progress.add_task("Hybrid merge", total=event.total)
                 current_task_desc = "Hybrid merge"
